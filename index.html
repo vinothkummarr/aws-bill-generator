@@ -263,12 +263,13 @@
             <h3>📊 Preview:</h3>
             <div id="previewContent"></div>
             <button id="downloadBtn" class="download-btn" style="display: none;">
-                💾 Download Excel File
+                💾 Download Styled Excel Report
             </button>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script>
         let processedData = null;
@@ -352,7 +353,8 @@
                 const summaryGST = structuredData.summary.gst;
                 
                 let statusMsg = `✅ Processing complete! Found ${serviceCount} services, ${accountCount} accounts. `;
-                statusMsg += `Summary GST: $${summaryGST.toFixed(2)}. You can now download the Excel file.`;
+                statusMsg += `Summary GST: $${summaryGST.toFixed(2)}. `;
+                statusMsg += `Styled Excel with AWS colors & filters ready for download!`;
                 
                 showStatus(statusMsg, 'success');
                 
@@ -365,10 +367,25 @@
             }
         });
 
-        document.getElementById('downloadBtn').addEventListener('click', function() {
+        document.getElementById('downloadBtn').addEventListener('click', async function() {
             if (processedData) {
                 const filename = fileName ? fileName + '_converted.xlsx' : 'aws_bill_converted.xlsx';
-                downloadExcel(processedData, filename);
+                
+                // Show loading status
+                showStatus('🔄 Generating styled Excel file... Please wait.', 'info');
+                this.disabled = true;
+                this.textContent = '⏳ Creating Excel...';
+                
+                try {
+                    await downloadExcel(processedData, filename);
+                    showStatus('✅ Excel file downloaded successfully with AWS styling!', 'success');
+                } catch (error) {
+                    showStatus('❌ Error creating Excel file. Please try again.', 'error');
+                    console.error('Download error:', error);
+                } finally {
+                    this.disabled = false;
+                    this.textContent = '💾 Download Styled Excel Report';
+                }
             }
         });
 
@@ -795,134 +812,150 @@
         }
 
         function convertToExcelFormat(data) {
-            const excelData = [];
-            
-            // Create the exact structure from bill.csv
+            // Create the exact structure from bill.csv with horizontal layout
             const headers = [
                 'Summary', 'Column2', 'Column3', '', '', '', 'SERVICES', '', '', '', 'ACCOUNT ACTIVITY', '', '', '', 'Summary for Linked Account', '', '', 'Detail for Linked Account', ''
             ];
-            excelData.push(headers);
-
-            // Summary section
-            excelData.push(['AWS Service Charges', '', data.summary.serviceCharges.toFixed(2)]);
-            excelData.push(['Charges', '', data.summary.charges.toFixed(2)]);
-            excelData.push(['Credits', '', data.summary.credits.toFixed(2)]);
-            excelData.push(['GST', '', data.summary.gst.toFixed(2)]);
-            excelData.push(['Total for this statement in USD', '', data.summary.total.toFixed(2)]);
+            
+            // Initialize with headers
+            const excelData = [headers];
+            
+            // Helper function to ensure row exists
+            function ensureRow(rowIndex) {
+                while (excelData.length <= rowIndex) {
+                    excelData.push(new Array(19).fill(''));
+                }
+                return excelData[rowIndex];
+            }
+            
+            // Summary section (columns 1-3, starting from row 2)
+            let summaryRow = 1;
+            let row;
+            
+            row = ensureRow(summaryRow++);
+            row[0] = 'AWS Service Charges'; row[2] = data.summary.serviceCharges.toFixed(2);
+            
+            row = ensureRow(summaryRow++);
+            row[0] = 'Charges'; row[2] = data.summary.charges.toFixed(2);
+            
+            row = ensureRow(summaryRow++);
+            row[0] = 'Credits'; row[2] = data.summary.credits.toFixed(2);
+            
+            row = ensureRow(summaryRow++);
+            row[0] = 'GST'; row[2] = data.summary.gst.toFixed(2);
+            
+            row = ensureRow(summaryRow++);
+            row[0] = 'Total for this statement in USD'; row[2] = data.summary.total.toFixed(2);
             
             if (data.summary.exchangeRate > 0 && data.summary.totalINR > 0) {
-                excelData.push([`Total for this statement (1 USD = ${data.summary.exchangeRate.toFixed(8)} INR )`, '1', `INR ${data.summary.totalINR.toLocaleString()}`]);
+                row = ensureRow(summaryRow);
+                row[0] = `Total for this statement (1 USD = ${data.summary.exchangeRate.toFixed(8)} INR )`;
+                row[1] = '1';
+                row[2] = `INR ${data.summary.totalINR.toLocaleString()}`;
             }
 
-            // Add empty rows for formatting
-            for (let i = 0; i < 3; i++) {
-                excelData.push(new Array(19).fill(''));
-            }
-
-            // Services section (consolidated)
-            let servicesRowIndex = excelData.length;
+            // Services section (columns 7-8, starting from row 2)
+            let servicesRow = 1;
             const servicesArray = Array.from(data.services.entries());
             
-            servicesArray.forEach(([serviceName, serviceData], index) => {
+            servicesArray.forEach(([serviceName, serviceData]) => {
                 // Service total row
-                const serviceRow = new Array(19).fill('');
-                serviceRow[6] = serviceName;
-                serviceRow[7] = serviceData.total.toFixed(2);
-                excelData.push(serviceRow);
+                row = ensureRow(servicesRow);
+                row[6] = serviceName;
+                row[7] = serviceData.total.toFixed(2);
+                servicesRow++;
                 
                 // Charges row
-                const chargesRow = new Array(19).fill('');
-                chargesRow[6] = 'Charges';
-                chargesRow[7] = serviceData.charges.toFixed(2);
-                excelData.push(chargesRow);
+                row = ensureRow(servicesRow);
+                row[6] = 'Charges';
+                row[7] = serviceData.charges.toFixed(2);
+                servicesRow++;
                 
                 // GST row
-                const gstRow = new Array(19).fill('');
-                gstRow[6] = 'GST';
-                gstRow[7] = serviceData.gst.toFixed(2);
-                excelData.push(gstRow);
+                row = ensureRow(servicesRow);
+                row[6] = 'GST';
+                row[7] = serviceData.gst.toFixed(2);
+                servicesRow++;
             });
 
-            // Account activities section
-            let accountsRowIndex = excelData.length;
+            // Account activities section (columns 11-12, starting from row 2)
+            let accountsRow = 1;
             const accountsArray = Array.from(data.accounts.entries());
             
-            accountsArray.forEach(([accountName, accountData], index) => {
+            accountsArray.forEach(([accountName, accountData]) => {
                 // Account total row
-                const accountRow = new Array(19).fill('');
-                accountRow[10] = `${accountName} (${accountData.id})`;
-                accountRow[11] = accountData.total.toFixed(2);
-                excelData.push(accountRow);
+                row = ensureRow(accountsRow);
+                row[10] = `${accountName} (${accountData.id})`;
+                row[11] = accountData.total.toFixed(2);
+                accountsRow++;
                 
                 // Charges row
-                const chargesRow = new Array(19).fill('');
-                chargesRow[10] = 'Charges';
-                chargesRow[11] = accountData.charges.toFixed(2);
-                excelData.push(chargesRow);
+                row = ensureRow(accountsRow);
+                row[10] = 'Charges';
+                row[11] = accountData.charges.toFixed(2);
+                accountsRow++;
                 
                 // Credits row
-                const creditsRow = new Array(19).fill('');
-                creditsRow[10] = 'Credits';
-                creditsRow[11] = accountData.credits.toFixed(2);
-                excelData.push(creditsRow);
+                row = ensureRow(accountsRow);
+                row[10] = 'Credits';
+                row[11] = accountData.credits.toFixed(2);
+                accountsRow++;
                 
                 // GST row
-                const gstRow = new Array(19).fill('');
-                gstRow[10] = 'GST';
-                gstRow[11] = accountData.gst.toFixed(2);
-                excelData.push(gstRow);
+                row = ensureRow(accountsRow);
+                row[10] = 'GST';
+                row[11] = accountData.gst.toFixed(2);
+                accountsRow++;
             });
 
-            // Add detailed breakdowns for each account
-            accountsArray.forEach(([accountName, accountData], accountIndex) => {
-                // Add account header
-                const accountHeaderRow = new Array(19).fill('');
-                accountHeaderRow[14] = `${accountName} (${accountData.id})`;
-                accountHeaderRow[15] = accountData.total.toFixed(2);
-                accountHeaderRow[17] = 'Detail for Linked Account';
-                accountHeaderRow[18] = 'Column2';
-                excelData.push(accountHeaderRow);
+            // Detailed account breakdowns (columns 15-19, starting from row 2)
+            let detailsRow = 1;
+            
+            accountsArray.forEach(([accountName, accountData]) => {
+                // Account header
+                row = ensureRow(detailsRow);
+                row[14] = `${accountName} (${accountData.id})`;
+                row[15] = accountData.total.toFixed(2);
+                row[17] = 'Detail for Linked Account';
+                row[18] = 'Column2';
+                detailsRow++;
 
-                // Get all services across all accounts for consistency
+                // Get all services for consistency
                 const allServices = new Set();
                 data.services.forEach((_, serviceName) => allServices.add(serviceName));
                 data.accounts.forEach((account, _) => {
                     account.services.forEach((_, serviceName) => allServices.add(serviceName));
                 });
 
-                // Add services for this account (including zeros for services not used)
+                // Add services for this account
                 Array.from(allServices).sort().forEach(serviceName => {
-                    const serviceRow = new Array(19).fill('');
-                    serviceRow[17] = serviceName;
+                    // Service row
+                    row = ensureRow(detailsRow);
+                    row[17] = serviceName;
+                    row[18] = accountData.services.has(serviceName) ? 
+                        accountData.services.get(serviceName).total.toFixed(2) : '0';
+                    detailsRow++;
                     
-                    if (accountData.services.has(serviceName)) {
-                        const serviceData = accountData.services.get(serviceName);
-                        serviceRow[18] = serviceData.total.toFixed(2);
-                    } else {
-                        serviceRow[18] = '0';
-                    }
-                    
-                    excelData.push(serviceRow);
-                    
-                    // Add charges row
-                    const chargesRow = new Array(19).fill('');
-                    chargesRow[17] = 'Charges';
-                    chargesRow[18] = accountData.services.has(serviceName) ? 
+                    // Charges row
+                    row = ensureRow(detailsRow);
+                    row[17] = 'Charges';
+                    row[18] = accountData.services.has(serviceName) ? 
                         (accountData.services.get(serviceName).charges || 0).toFixed(2) : '0';
-                    excelData.push(chargesRow);
+                    detailsRow++;
                     
-                    // Add GST row
-                    const gstRow = new Array(19).fill('');
-                    gstRow[17] = 'GST';
-                    gstRow[18] = accountData.services.has(serviceName) ? 
+                    // GST row
+                    row = ensureRow(detailsRow);
+                    row[17] = 'GST';
+                    row[18] = accountData.services.has(serviceName) ? 
                         (accountData.services.get(serviceName).gst || 0).toFixed(2) : '0';
-                    excelData.push(gstRow);
+                    detailsRow++;
                 });
                 
-                // Add empty row between accounts
-                excelData.push(new Array(19).fill(''));
+                // Add space between accounts
+                detailsRow++;
             });
 
+            // Return the complete data (rows are created as needed)
             return excelData;
         }
 
@@ -955,24 +988,258 @@
             previewDiv.style.display = 'block';
         }
 
-        function downloadExcel(data, filename) {
-            const ws = XLSX.utils.aoa_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'AWS Bill');
+        function addSectionBorders(worksheet, data, awsColors) {
+            // Define section areas based on bill.csv structure
+            const sections = [
+                // Summary section (columns 1-3)
+                { name: 'Summary', startCol: 1, endCol: 3, startRow: 2, endRow: 8, color: awsColors.darkBlue },
+                
+                // Services section (columns 7-8) 
+                { name: 'Services', startCol: 7, endCol: 8, startRow: 2, endRow: data.length, color: awsColors.orange },
+                
+                // Account Activity section (columns 11-12)
+                { name: 'Accounts', startCol: 11, endCol: 12, startRow: 2, endRow: data.length, color: awsColors.lightBlue },
+                
+                // Detailed Account section (columns 15-19)
+                { name: 'Details', startCol: 15, endCol: 19, startRow: 2, endRow: data.length, color: awsColors.lightBlue }
+            ];
             
-            // Auto-adjust column widths
-            const colWidths = [];
-            for (let i = 0; i < data[0].length; i++) {
-                let maxWidth = 0;
-                for (let j = 0; j < data.length; j++) {
-                    const cellValue = data[j][i] ? data[j][i].toString() : '';
-                    maxWidth = Math.max(maxWidth, cellValue.length);
+            sections.forEach(section => {
+                // Find actual end row for this section (non-empty data)
+                let actualEndRow = section.startRow;
+                for (let row = section.startRow; row <= Math.min(section.endRow, data.length); row++) {
+                    const hasData = data[row - 1] && data[row - 1].slice(section.startCol - 1, section.endCol).some(cell => cell && cell.toString().trim());
+                    if (hasData) {
+                        actualEndRow = row;
+                    }
                 }
-                colWidths.push({ wch: Math.min(maxWidth + 2, 50) });
+                
+                // Add section border
+                for (let row = section.startRow; row <= actualEndRow; row++) {
+                    for (let col = section.startCol; col <= section.endCol; col++) {
+                        const cell = worksheet.getCell(row, col);
+                        
+                        // Add border based on position in section
+                        const border = {};
+                        
+                        if (row === section.startRow) {
+                            border.top = { style: 'medium', color: { argb: section.color } };
+                        }
+                        if (row === actualEndRow) {
+                            border.bottom = { style: 'medium', color: { argb: section.color } };
+                        }
+                        if (col === section.startCol) {
+                            border.left = { style: 'medium', color: { argb: section.color } };
+                        }
+                        if (col === section.endCol) {
+                            border.right = { style: 'medium', color: { argb: section.color } };
+                        }
+                        
+                        cell.border = { ...cell.border, ...border };
+                    }
+                }
+            });
+        }
+
+        async function downloadExcel(data, filename) {
+            try {
+                // Create a new workbook using ExcelJS
+                const workbook = new ExcelJS.Workbook();
+                const worksheet = workbook.addWorksheet('AWS Bill Analysis');
+                
+                // AWS Brand Colors
+                const awsColors = {
+                    orange: 'FF9900',      // AWS Orange
+                    darkBlue: '232F3E',    // AWS Dark Blue
+                    lightBlue: '146EB4',   // AWS Light Blue
+                    lightGray: 'F2F3F3',   // Light background
+                    white: 'FFFFFF',       // White
+                    darkGray: '666666'     // Dark gray text
+                };
+                
+                // Add data to worksheet
+                data.forEach((row, rowIndex) => {
+                    const excelRow = worksheet.addRow(row);
+                    
+                                         // Style each cell in the row
+                     excelRow.eachCell((cell, colNumber) => {
+                         // Remove default borders (we'll add section borders later)
+                         cell.border = {};
+                        
+                        cell.font = {
+                            name: 'Arial',
+                            size: 10,
+                            color: { argb: awsColors.darkGray }
+                        };
+                        
+                        cell.alignment = {
+                            vertical: 'middle',
+                            horizontal: 'left'
+                        };
+                        
+                        // Header row styling (row 1)
+                        if (rowIndex === 0) {
+                            cell.fill = {
+                                type: 'pattern',
+                                pattern: 'solid',
+                                fgColor: { argb: awsColors.darkBlue }
+                            };
+                            cell.font = {
+                                name: 'Arial',
+                                size: 11,
+                                bold: true,
+                                color: { argb: awsColors.white }
+                            };
+                            cell.alignment = {
+                                vertical: 'middle',
+                                horizontal: 'center'
+                            };
+                        }
+                        
+                        // Apply specific styling based on cell content
+                        else if (cell.value && typeof cell.value === 'string') {
+                            const cellValue = cell.value.toString().toUpperCase();
+                            
+                            // Main section headers
+                            if (cellValue === 'SUMMARY' || cellValue === 'SERVICES' || 
+                                cellValue === 'ACCOUNT ACTIVITY' || cellValue === 'SUMMARY FOR LINKED ACCOUNT' ||
+                                cellValue === 'DETAIL FOR LINKED ACCOUNT') {
+                                cell.fill = {
+                                    type: 'pattern',
+                                    pattern: 'solid',
+                                    fgColor: { argb: awsColors.orange }
+                                };
+                                cell.font = {
+                                    name: 'Arial',
+                                    size: 11,
+                                    bold: true,
+                                    color: { argb: awsColors.white }
+                                };
+                                cell.alignment = {
+                                    vertical: 'middle',
+                                    horizontal: 'center'
+                                };
+                            }
+                            
+                            // Account names styling
+                            else if (cellValue.includes('(') && cellValue.includes(')') && !cellValue.includes('$')) {
+                                cell.fill = {
+                                    type: 'pattern',
+                                    pattern: 'solid',
+                                    fgColor: { argb: awsColors.lightBlue }
+                                };
+                                cell.font = {
+                                    name: 'Arial',
+                                    size: 10,
+                                    bold: true,
+                                    color: { argb: awsColors.white }
+                                };
+                            }
+                            
+                            // Service names styling
+                            else if (cellValue.includes('AMAZON') || cellValue.includes('AWS') || cellValue.includes('ELASTIC')) {
+                                cell.fill = {
+                                    type: 'pattern',
+                                    pattern: 'solid',
+                                    fgColor: { argb: awsColors.lightGray }
+                                };
+                                cell.font = {
+                                    name: 'Arial',
+                                    size: 10,
+                                    bold: true,
+                                    color: { argb: awsColors.darkBlue }
+                                };
+                            }
+                            
+                            // Charges, Credits, GST styling
+                            else if (cellValue === 'CHARGES' || cellValue === 'CREDITS' || cellValue === 'GST') {
+                                cell.fill = {
+                                    type: 'pattern',
+                                    pattern: 'solid',
+                                    fgColor: { argb: awsColors.lightGray }
+                                };
+                                cell.font = {
+                                    name: 'Arial',
+                                    size: 9,
+                                    color: { argb: awsColors.darkGray }
+                                };
+                                cell.alignment = {
+                                    vertical: 'middle',
+                                    horizontal: 'right'
+                                };
+                            }
+                        }
+                        
+                        // Amount columns styling (numeric values)
+                        if (cell.value && typeof cell.value === 'number') {
+                            cell.alignment = {
+                                vertical: 'middle',
+                                horizontal: 'right'
+                            };
+                            cell.numFmt = '#,##0.00';
+                        }
+                        
+                        // Amount columns styling (string values that look like numbers)
+                        else if (cell.value && typeof cell.value === 'string' && 
+                                 (cell.value.includes('$') || /^\d+\.?\d*$/.test(cell.value))) {
+                            cell.alignment = {
+                                vertical: 'middle',
+                                horizontal: 'right'
+                            };
+                        }
+                    });
+                                 });
+                 
+                 // Add colored section borders
+                 addSectionBorders(worksheet, data, awsColors);
+                 
+                 // Auto-adjust column widths
+                 worksheet.columns.forEach((column, index) => {
+                     let maxWidth = 0;
+                     data.forEach(row => {
+                         const cellValue = row[index] ? row[index].toString() : '';
+                         maxWidth = Math.max(maxWidth, cellValue.length);
+                     });
+                     column.width = Math.min(maxWidth + 3, 25);
+                 });
+                 
+                 // Add auto-filter to all columns
+                 worksheet.autoFilter = {
+                     from: { row: 1, column: 1 },
+                     to: { row: data.length, column: data[0].length }
+                 };
+                
+                // Freeze the first row
+                worksheet.views = [
+                    { state: 'frozen', ySplit: 1 }
+                ];
+                
+                // Set workbook properties
+                workbook.creator = 'AWS Bill Generator';
+                workbook.lastModifiedBy = 'AWS Bill Generator';
+                workbook.created = new Date();
+                workbook.modified = new Date();
+                workbook.subject = 'AWS Service Charges and Account Activity';
+                workbook.title = 'AWS Bill Analysis';
+                
+                // Generate Excel file and download
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                
+            } catch (error) {
+                console.error('Error creating Excel file:', error);
+                // Fallback to basic XLSX if ExcelJS fails
+                const ws = XLSX.utils.aoa_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'AWS Bill');
+                XLSX.writeFile(wb, filename);
             }
-            ws['!cols'] = colWidths;
-            
-            XLSX.writeFile(wb, filename);
         }
     </script>
 </body>

@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Bill to Excel Converter</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .upload-section {
+            border: 3px dashed #3498db;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-section:hover {
+            border-color: #2980b9;
+            background: #e8f4f8;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .file-label {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            display: inline-block;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+            border: none;
+        }
+        
+        .file-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+        
+        .process-btn {
+            background: linear-gradient(45deg, #27ae60, #229954);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1.2em;
+            display: block;
+            margin: 20px auto;
+            transition: all 0.3s ease;
+        }
+        
+        .process-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4);
+        }
+        
+        .process-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #cce7ff;
+            color: #004085;
+            border: 1px solid #b8d4fd;
+        }
+        
+        .preview-section {
+            margin-top: 30px;
+            max-height: 500px;
+            overflow: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8em;
+        }
+        
+        .preview-table th,
+        .preview-table td {
+            border: 1px solid #dee2e6;
+            padding: 4px;
+            text-align: left;
+        }
+        
+        .preview-table th {
+            background: #e9ecef;
+            font-weight: bold;
+        }
+        
+        .download-btn {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1.1em;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+        }
+        
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .instructions h3 {
+            color: #856404;
+            margin-top: 0;
+        }
+        
+        .instructions ul {
+            color: #856404;
+            margin-bottom: 0;
+        }
+        
+        .text-input {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            resize: vertical;
+            margin-bottom: 20px;
+        }
+        
+        .input-option {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        
+        .input-option h4 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        
+        .toggle-btn {
+            background: #6c757d;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        
+        .toggle-btn.active {
+            background: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 AWS Bill to Excel Converter</h1>
+        
+        <div class="instructions">
+            <h3>📋 Instructions:</h3>
+            <ul>
+                <li>Choose either PDF upload or manual text input</li>
+                <li>The tool will extract billing data and convert it to Excel format</li>
+                <li>Output will match the exact structure of your bill.csv file</li>
+                <li>Includes consolidated services, account activities, and detailed breakdowns</li>
+                <li>All amounts will be processed in USD with proper GST calculations</li>
+            </ul>
+        </div>
+        
+        <div class="input-option">
+            <h4>Input Method:</h4>
+            <button class="toggle-btn active" onclick="toggleInputMethod('pdf')">PDF Upload</button>
+            <button class="toggle-btn" onclick="toggleInputMethod('text')">Manual Text Input</button>
+        </div>
+        
+        <div id="pdfInput" class="upload-section">
+            <input type="file" id="pdfFile" class="file-input" accept=".pdf" />
+            <label for="pdfFile" class="file-label">
+                📄 Select AWS Invoice PDF
+            </label>
+            <p style="margin-top: 15px; color: #666;">
+                <span id="fileName">No file selected</span>
+            </p>
+        </div>
+        
+        <div id="textInput" class="input-option" style="display: none;">
+            <h4>Paste AWS Bill Text:</h4>
+            <textarea id="billText" class="text-input" placeholder="Paste the text content from your AWS bill here..."></textarea>
+        </div>
+        
+        <button id="processBtn" class="process-btn" disabled>
+            ⚡ Convert to Excel
+        </button>
+        
+        <div id="status"></div>
+        
+        <div id="preview" class="preview-section" style="display: none;">
+            <h3>📊 Preview:</h3>
+            <div id="previewContent"></div>
+            <button id="downloadBtn" class="download-btn" style="display: none;">
+                💾 Download Excel File
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script>
+        let processedData = null;
+        let fileName = '';
+        let inputMethod = 'pdf';
+
+        // Set PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        function toggleInputMethod(method) {
+            inputMethod = method;
+            document.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (method === 'pdf') {
+                document.getElementById('pdfInput').style.display = 'block';
+                document.getElementById('textInput').style.display = 'none';
+                document.getElementById('processBtn').disabled = !document.getElementById('pdfFile').files[0];
+            } else {
+                document.getElementById('pdfInput').style.display = 'none';
+                document.getElementById('textInput').style.display = 'block';
+                document.getElementById('processBtn').disabled = !document.getElementById('billText').value.trim();
+            }
+        }
+
+        document.getElementById('pdfFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                fileName = file.name.replace('.pdf', '');
+                document.getElementById('fileName').textContent = file.name;
+                document.getElementById('processBtn').disabled = false;
+            }
+        });
+
+        document.getElementById('billText').addEventListener('input', function(e) {
+            document.getElementById('processBtn').disabled = !e.target.value.trim();
+        });
+
+        document.getElementById('processBtn').addEventListener('click', async function() {
+            this.disabled = true;
+            showStatus('Processing bill data... Please wait.', 'info');
+
+            try {
+                let text = '';
+                if (inputMethod === 'pdf') {
+                    const fileInput = document.getElementById('pdfFile');
+                    const file = fileInput.files[0];
+                    if (!file) {
+                        showStatus('Please select a PDF file first.', 'error');
+                        return;
+                    }
+                    text = await extractTextFromPDF(file);
+                } else {
+                    text = document.getElementById('billText').value.trim();
+                    if (!text) {
+                        showStatus('Please enter the bill text.', 'error');
+                        return;
+                    }
+                }
+
+                const structuredData = parseAWSBill(text);
+                
+                // Debug: Show what was parsed
+                console.log('Parsed Data:', structuredData);
+                console.log('Summary Values:', {
+                    serviceCharges: structuredData.summary.serviceCharges,
+                    charges: structuredData.summary.charges,
+                    credits: structuredData.summary.credits,
+                    gst: structuredData.summary.gst,
+                    total: structuredData.summary.total
+                });
+                
+                const excelData = convertToExcelFormat(structuredData);
+                
+                processedData = excelData;
+                showPreview(excelData);
+                
+                // Show parsing summary
+                const serviceCount = structuredData.services.size;
+                const accountCount = structuredData.accounts.size;
+                const summaryGST = structuredData.summary.gst;
+                
+                let statusMsg = `✅ Processing complete! Found ${serviceCount} services, ${accountCount} accounts. `;
+                statusMsg += `Summary GST: $${summaryGST.toFixed(2)}. You can now download the Excel file.`;
+                
+                showStatus(statusMsg, 'success');
+                
+                document.getElementById('downloadBtn').style.display = 'inline-block';
+            } catch (error) {
+                console.error('Error processing bill:', error);
+                showStatus('❌ Error processing bill: ' + error.message, 'error');
+            } finally {
+                this.disabled = false;
+            }
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            if (processedData) {
+                const filename = fileName ? fileName + '_converted.xlsx' : 'aws_bill_converted.xlsx';
+                downloadExcel(processedData, filename);
+            }
+        });
+
+        async function extractTextFromPDF(file) {
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let text = '';
+                
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    
+                    // Better text extraction with positioning and formatting
+                    const textItems = textContent.items.map(item => ({
+                        text: item.str,
+                        x: item.transform[4],
+                        y: item.transform[5],
+                        width: item.width,
+                        height: item.height
+                    }));
+                    
+                    // Sort by vertical position (y-coordinate) then horizontal (x-coordinate)
+                    textItems.sort((a, b) => {
+                        if (Math.abs(a.y - b.y) < 2) { // Same line tolerance
+                            return a.x - b.x;
+                        }
+                        return b.y - a.y; // Top to bottom
+                    });
+                    
+                    // Group items by line and reconstruct text
+                    let currentLine = '';
+                    let lastY = null;
+                    
+                    for (const item of textItems) {
+                        if (lastY !== null && Math.abs(item.y - lastY) > 2) {
+                            if (currentLine.trim()) {
+                                text += currentLine.trim() + '\n';
+                            }
+                            currentLine = '';
+                        }
+                        
+                        currentLine += item.text + ' ';
+                        lastY = item.y;
+                    }
+                    
+                    if (currentLine.trim()) {
+                        text += currentLine.trim() + '\n';
+                    }
+                }
+                
+                return text;
+            } catch (error) {
+                console.error('Error extracting text from PDF:', error);
+                throw new Error('Failed to extract text from PDF. Please try manual text input.');
+            }
+        }
+
+        function parseAWSBill(text) {
+            const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+            
+            const data = {
+                summary: {
+                    serviceCharges: 0,
+                    charges: 0,
+                    credits: 0,
+                    gst: 0,
+                    total: 0,
+                    totalINR: 0,
+                    exchangeRate: 0
+                },
+                services: new Map(),
+                accounts: new Map()
+            };
+
+            let currentSection = '';
+            let currentAccount = '';
+            let currentService = '';
+            let processingServiceDetails = false;
+            let summaryParsed = false; // Track if summary section has been processed
+            const GST_RATE = 0.18; // 18% standard GST rate
+
+            function calculateGST(charges) {
+                return charges * GST_RATE;
+            }
+
+            function extractAmount(text) {
+                const matches = text.match(/\$?([\d,]+\.?\d*)/);
+                return matches ? parseFloat(matches[1].replace(/,/g, '')) : 0;
+            }
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                // Detect Summary section explicitly
+                if (line.trim() === 'Summary' || line.includes('Account Summary')) {
+                    currentSection = 'summary';
+                    summaryParsed = false;
+                    continue;
+                }
+                
+                // Parse summary section values when in summary section
+                if (currentSection === 'summary' && !summaryParsed) {
+                    if (line.includes('AWS Service Charges') || line.includes('Service Charges')) {
+                        const amount = extractAmount(line);
+                        if (amount > 0) {
+                            data.summary.serviceCharges = amount;
+                            console.log('Summary - Service Charges:', amount);
+                        }
+                    }
+                    
+                    if (line.match(/^Charges\s+\$/) && !line.includes('Service Charges')) {
+                        data.summary.charges = extractAmount(line);
+                        console.log('Summary - Charges:', data.summary.charges);
+                    }
+                    
+                    if (line.match(/^Credits\s+\$/)) {
+                        data.summary.credits = extractAmount(line);
+                        console.log('Summary - Credits:', data.summary.credits);
+                    }
+                    
+                    if (line.match(/^GST\s+\$/)) {
+                        data.summary.gst = extractAmount(line);
+                        console.log('Summary - GST:', data.summary.gst);
+                    }
+                    
+                    if (line.includes('Total for this statement in USD') || line.includes('Total for this statement')) {
+                        const amount = extractAmount(line);
+                        if (amount > 0) {
+                            data.summary.total = amount;
+                            summaryParsed = true; // Mark summary as completely parsed
+                            console.log('Summary - Total:', amount, '- Summary parsing completed');
+                        }
+                    }
+                }
+
+                // Parse exchange rate
+                if (line.includes('1 USD =') && line.includes('INR')) {
+                    const match = line.match(/1 USD = ([\d.]+) INR/);
+                    if (match) data.summary.exchangeRate = parseFloat(match[1]);
+                }
+
+                // Parse INR total
+                if (line.includes('INR ')) {
+                    const match = line.match(/INR ([\d,]+\.?\d*)/);
+                    if (match) data.summary.totalINR = parseFloat(match[1].replace(/,/g, ''));
+                }
+
+                // Detect other sections (only after summary is parsed or if not in summary)
+                if (summaryParsed || currentSection !== 'summary') {
+                    if (line.includes('Detail for Consolidated Bill') || line.includes('Consolidated Bill')) {
+                        currentSection = 'services';
+                        processingServiceDetails = false;
+                        currentAccount = '';
+                        currentService = '';
+                        continue;
+                    }
+
+                    if (line.includes('Activity By Account') || line.includes('By Account')) {
+                        currentSection = 'accounts';
+                        processingServiceDetails = false;
+                        currentAccount = '';
+                        currentService = '';
+                        continue;
+                    }
+
+                    if (line.includes('Summary for Linked Account')) {
+                        currentSection = 'accountSummary';
+                        processingServiceDetails = false;
+                        currentService = '';
+                        currentAccount = '';
+                        continue;
+                    }
+
+                    if (line.includes('Detail for Linked Account')) {
+                        currentSection = 'accountDetails';
+                        processingServiceDetails = false;
+                        currentService = '';
+                        continue;
+                    }
+                }
+
+                // Parse services in consolidated bill (only when not in summary section)
+                if (currentSection === 'services' && summaryParsed) {
+                    // Service name with amount
+                    const serviceMatch = line.match(/^(Amazon[\w\s]+|AWS[\w\s]+|Elastic[\w\s]+)\s+\$?([\d,]+\.?\d*)$/);
+                    if (serviceMatch) {
+                        const serviceName = serviceMatch[1].trim();
+                        const amount = parseFloat(serviceMatch[2].replace(/,/g, ''));
+                        
+                        currentService = serviceName;
+                        
+                        if (!data.services.has(serviceName)) {
+                            data.services.set(serviceName, {
+                                total: amount,
+                                charges: 0,
+                                gst: 0
+                            });
+                        }
+                        
+                        processingServiceDetails = true;
+                        continue;
+                    }
+                    
+                    // Parse service details (Charges, GST)
+                    if (processingServiceDetails && currentService) {
+                        if (line.includes('Charges') && line.includes('$')) {
+                            const charges = extractAmount(line);
+                            data.services.get(currentService).charges = charges;
+                        }
+                        
+                        if (line.includes('GST') && line.includes('$')) {
+                            const gst = extractAmount(line);
+                            data.services.get(currentService).gst = gst;
+                            processingServiceDetails = false;
+                            currentService = '';
+                        }
+                    }
+                }
+
+                // Parse account activities (only when not in summary section)
+                if (currentSection === 'accounts' && summaryParsed) {
+                    // Account name with ID and amount
+                    const accountMatch = line.match(/^(.+?)\s+\((\d+)\)\s+\$?([\d,]+\.?\d*)$/);
+                    if (accountMatch) {
+                        const accountName = accountMatch[1].trim();
+                        const accountId = accountMatch[2];
+                        const amount = parseFloat(accountMatch[3].replace(/,/g, ''));
+                        
+                        currentAccount = accountName;
+                        
+                        if (!data.accounts.has(accountName)) {
+                            data.accounts.set(accountName, {
+                                id: accountId,
+                                total: amount,
+                                charges: 0,
+                                credits: 0,
+                                gst: 0,
+                                services: new Map()
+                            });
+                        }
+                        
+                        processingServiceDetails = true;
+                        continue;
+                    }
+                    
+                    // Parse account details (Charges, Credits, GST)
+                    if (processingServiceDetails && currentAccount) {
+                        if (line.includes('Charges') && line.includes('$')) {
+                            const charges = extractAmount(line);
+                            data.accounts.get(currentAccount).charges = charges;
+                        }
+                        
+                        if (line.includes('Credits') && line.includes('$')) {
+                            const credits = extractAmount(line);
+                            data.accounts.get(currentAccount).credits = credits;
+                        }
+                        
+                        if (line.includes('GST') && line.includes('$')) {
+                            const gst = extractAmount(line);
+                            data.accounts.get(currentAccount).gst = gst;
+                            processingServiceDetails = false;
+                        }
+                    }
+                    
+                    // Parse individual services for accounts
+                    if (currentAccount && line.match(/^(Amazon|AWS|Elastic).+\$\d+/)) {
+                        const match = line.match(/^(.+?)\s+\$?([\d,]+\.?\d*)$/);
+                        if (match) {
+                            const serviceName = match[1].trim();
+                            const amount = parseFloat(match[2].replace(/,/g, ''));
+                            
+                            if (!data.accounts.get(currentAccount).services.has(serviceName)) {
+                                data.accounts.get(currentAccount).services.set(serviceName, {
+                                    total: amount,
+                                    charges: 0,
+                                    gst: 0
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // Parse account summary section (captures account-level GST)
+                if (currentSection === 'accountSummary' && summaryParsed) {
+                    // Account name with ID and amount
+                    const accountMatch = line.match(/^(.+?)\s+\((\d+)\)\s+\$?([\d,]+\.?\d*)$/);
+                    if (accountMatch) {
+                        const accountName = accountMatch[1].trim();
+                        const accountId = accountMatch[2];
+                        const amount = parseFloat(accountMatch[3].replace(/,/g, ''));
+                        
+                        currentAccount = accountName;
+                        
+                        // Make sure the account exists (it should from the 'accounts' section)
+                        if (!data.accounts.has(accountName)) {
+                            data.accounts.set(accountName, {
+                                id: accountId,
+                                total: amount,
+                                charges: 0,
+                                credits: 0,
+                                gst: 0,
+                                services: new Map()
+                            });
+                        }
+                        
+                        processingServiceDetails = true;
+                        continue;
+                    }
+                    
+                    // Parse account details (Charges, Credits, GST)
+                    if (processingServiceDetails && currentAccount) {
+                        if (line.includes('Charges') && line.includes('$')) {
+                            const charges = extractAmount(line);
+                            data.accounts.get(currentAccount).charges = charges;
+                        }
+                        
+                        if (line.includes('Credits') && line.includes('$')) {
+                            const credits = extractAmount(line);
+                            data.accounts.get(currentAccount).credits = credits;
+                        }
+                        
+                        if (line.includes('GST') && line.includes('$')) {
+                            const gst = extractAmount(line);
+                            data.accounts.get(currentAccount).gst = gst;
+                        }
+                    }
+                }
+
+                // Parse detailed linked account services
+                if (currentSection === 'accountDetails' && summaryParsed) {
+                    // Detect which account we're processing (from "Summary for Linked Account" section)
+                    const accountMatch = line.match(/^(.+?)\s+\((\d+)\)\s+\$?([\d,]+\.?\d*)$/);
+                    if (accountMatch) {
+                        const accountName = accountMatch[1].trim();
+                        currentAccount = accountName;
+                        processingServiceDetails = false;
+                        continue;
+                    }
+
+                    // Parse service name with amount in account details
+                    if (currentAccount && line.match(/^(Amazon|AWS|Elastic).+\$[\d,]*\.?\d*$/)) {
+                        const serviceMatch = line.match(/^(.+?)\s+\$?([\d,]+\.?\d*)$/);
+                        if (serviceMatch) {
+                            const serviceName = serviceMatch[1].trim();
+                            const amount = parseFloat(serviceMatch[2].replace(/,/g, ''));
+                            
+                            currentService = serviceName;
+                            
+                            if (data.accounts.has(currentAccount)) {
+                                if (!data.accounts.get(currentAccount).services.has(serviceName)) {
+                                    data.accounts.get(currentAccount).services.set(serviceName, {
+                                        total: amount,
+                                        charges: 0,
+                                        gst: 0
+                                    });
+                                }
+                            }
+                            
+                            processingServiceDetails = true;
+                            continue;
+                        }
+                    }
+                    
+                    // Parse service details (Charges, GST) for account services
+                    if (processingServiceDetails && currentService && currentAccount) {
+                        if (line.includes('Charges') && line.includes('$')) {
+                            const charges = extractAmount(line);
+                            if (data.accounts.has(currentAccount)) {
+                                data.accounts.get(currentAccount).services.get(currentService).charges = charges;
+                            }
+                        }
+                        
+                        if (line.includes('GST') && line.includes('$')) {
+                            const gst = extractAmount(line);
+                            if (data.accounts.has(currentAccount)) {
+                                data.accounts.get(currentAccount).services.get(currentService).gst = gst;
+                            }
+                            processingServiceDetails = false;
+                            currentService = '';
+                        }
+                    }
+                }
+            }
+
+            // Calculate missing GST values where not found (only for truly missing data)
+            data.services.forEach((service, serviceName) => {
+                if (service.gst === 0 && service.charges > 0) {
+                    service.gst = calculateGST(service.charges);
+                }
+                // Ensure total is correct regardless of whether GST was extracted or calculated
+                if (service.charges > 0 && service.gst > 0) {
+                    service.total = service.charges + service.gst;
+                }
+            });
+
+            data.accounts.forEach((account, accountName) => {
+                if (account.gst === 0 && account.charges > 0) {
+                    account.gst = calculateGST(account.charges);
+                }
+                // Ensure total is correct
+                if (account.charges > 0 && account.gst > 0) {
+                    account.total = account.charges + account.gst;
+                }
+                
+                // Calculate GST for account services only if missing
+                account.services.forEach((service, serviceName) => {
+                    if (service.gst === 0 && service.charges > 0) {
+                        service.gst = calculateGST(service.charges);
+                    }
+                    // Ensure total is correct
+                    if (service.charges > 0 && service.gst > 0) {
+                        service.total = service.charges + service.gst;
+                    }
+                });
+            });
+
+            // Calculate summary GST only if not found (preserve extracted values)
+            if (data.summary.gst === 0 && data.summary.charges > 0) {
+                data.summary.gst = calculateGST(data.summary.charges);
+            }
+
+            return data;
+        }
+
+        function convertToExcelFormat(data) {
+            const excelData = [];
+            
+            // Create the exact structure from bill.csv
+            const headers = [
+                'Summary', 'Column2', 'Column3', '', '', '', 'SERVICES', '', '', '', 'ACCOUNT ACTIVITY', '', '', '', 'Summary for Linked Account', '', '', 'Detail for Linked Account', ''
+            ];
+            excelData.push(headers);
+
+            // Summary section
+            excelData.push(['AWS Service Charges', '', data.summary.serviceCharges.toFixed(2)]);
+            excelData.push(['Charges', '', data.summary.charges.toFixed(2)]);
+            excelData.push(['Credits', '', data.summary.credits.toFixed(2)]);
+            excelData.push(['GST', '', data.summary.gst.toFixed(2)]);
+            excelData.push(['Total for this statement in USD', '', data.summary.total.toFixed(2)]);
+            
+            if (data.summary.exchangeRate > 0 && data.summary.totalINR > 0) {
+                excelData.push([`Total for this statement (1 USD = ${data.summary.exchangeRate.toFixed(8)} INR )`, '1', `INR ${data.summary.totalINR.toLocaleString()}`]);
+            }
+
+            // Add empty rows for formatting
+            for (let i = 0; i < 3; i++) {
+                excelData.push(new Array(19).fill(''));
+            }
+
+            // Services section (consolidated)
+            let servicesRowIndex = excelData.length;
+            const servicesArray = Array.from(data.services.entries());
+            
+            servicesArray.forEach(([serviceName, serviceData], index) => {
+                // Service total row
+                const serviceRow = new Array(19).fill('');
+                serviceRow[6] = serviceName;
+                serviceRow[7] = serviceData.total.toFixed(2);
+                excelData.push(serviceRow);
+                
+                // Charges row
+                const chargesRow = new Array(19).fill('');
+                chargesRow[6] = 'Charges';
+                chargesRow[7] = serviceData.charges.toFixed(2);
+                excelData.push(chargesRow);
+                
+                // GST row
+                const gstRow = new Array(19).fill('');
+                gstRow[6] = 'GST';
+                gstRow[7] = serviceData.gst.toFixed(2);
+                excelData.push(gstRow);
+            });
+
+            // Account activities section
+            let accountsRowIndex = excelData.length;
+            const accountsArray = Array.from(data.accounts.entries());
+            
+            accountsArray.forEach(([accountName, accountData], index) => {
+                // Account total row
+                const accountRow = new Array(19).fill('');
+                accountRow[10] = `${accountName} (${accountData.id})`;
+                accountRow[11] = accountData.total.toFixed(2);
+                excelData.push(accountRow);
+                
+                // Charges row
+                const chargesRow = new Array(19).fill('');
+                chargesRow[10] = 'Charges';
+                chargesRow[11] = accountData.charges.toFixed(2);
+                excelData.push(chargesRow);
+                
+                // Credits row
+                const creditsRow = new Array(19).fill('');
+                creditsRow[10] = 'Credits';
+                creditsRow[11] = accountData.credits.toFixed(2);
+                excelData.push(creditsRow);
+                
+                // GST row
+                const gstRow = new Array(19).fill('');
+                gstRow[10] = 'GST';
+                gstRow[11] = accountData.gst.toFixed(2);
+                excelData.push(gstRow);
+            });
+
+            // Add detailed breakdowns for each account
+            accountsArray.forEach(([accountName, accountData], accountIndex) => {
+                // Add account header
+                const accountHeaderRow = new Array(19).fill('');
+                accountHeaderRow[14] = `${accountName} (${accountData.id})`;
+                accountHeaderRow[15] = accountData.total.toFixed(2);
+                accountHeaderRow[17] = 'Detail for Linked Account';
+                accountHeaderRow[18] = 'Column2';
+                excelData.push(accountHeaderRow);
+
+                // Get all services across all accounts for consistency
+                const allServices = new Set();
+                data.services.forEach((_, serviceName) => allServices.add(serviceName));
+                data.accounts.forEach((account, _) => {
+                    account.services.forEach((_, serviceName) => allServices.add(serviceName));
+                });
+
+                // Add services for this account (including zeros for services not used)
+                Array.from(allServices).sort().forEach(serviceName => {
+                    const serviceRow = new Array(19).fill('');
+                    serviceRow[17] = serviceName;
+                    
+                    if (accountData.services.has(serviceName)) {
+                        const serviceData = accountData.services.get(serviceName);
+                        serviceRow[18] = serviceData.total.toFixed(2);
+                    } else {
+                        serviceRow[18] = '0';
+                    }
+                    
+                    excelData.push(serviceRow);
+                    
+                    // Add charges row
+                    const chargesRow = new Array(19).fill('');
+                    chargesRow[17] = 'Charges';
+                    chargesRow[18] = accountData.services.has(serviceName) ? 
+                        (accountData.services.get(serviceName).charges || 0).toFixed(2) : '0';
+                    excelData.push(chargesRow);
+                    
+                    // Add GST row
+                    const gstRow = new Array(19).fill('');
+                    gstRow[17] = 'GST';
+                    gstRow[18] = accountData.services.has(serviceName) ? 
+                        (accountData.services.get(serviceName).gst || 0).toFixed(2) : '0';
+                    excelData.push(gstRow);
+                });
+                
+                // Add empty row between accounts
+                excelData.push(new Array(19).fill(''));
+            });
+
+            return excelData;
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function showPreview(data) {
+            const previewDiv = document.getElementById('preview');
+            const previewContent = document.getElementById('previewContent');
+            
+            let html = '<table class="preview-table">';
+            
+            // Show first 20 rows
+            for (let i = 0; i < Math.min(20, data.length); i++) {
+                html += '<tr>';
+                for (let j = 0; j < Math.min(10, data[i].length); j++) {
+                    html += `<td>${data[i][j] || ''}</td>`;
+                }
+                html += '</tr>';
+            }
+            
+            html += '</table>';
+            if (data.length > 20) {
+                html += '<p><em>... and ' + (data.length - 20) + ' more rows</em></p>';
+            }
+            
+            previewContent.innerHTML = html;
+            previewDiv.style.display = 'block';
+        }
+
+        function downloadExcel(data, filename) {
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'AWS Bill');
+            
+            // Auto-adjust column widths
+            const colWidths = [];
+            for (let i = 0; i < data[0].length; i++) {
+                let maxWidth = 0;
+                for (let j = 0; j < data.length; j++) {
+                    const cellValue = data[j][i] ? data[j][i].toString() : '';
+                    maxWidth = Math.max(maxWidth, cellValue.length);
+                }
+                colWidths.push({ wch: Math.min(maxWidth + 2, 50) });
+            }
+            ws['!cols'] = colWidths;
+            
+            XLSX.writeFile(wb, filename);
+        }
+    </script>
+</body>
+</html>
